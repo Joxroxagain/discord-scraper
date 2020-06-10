@@ -2,7 +2,9 @@
 	"author": "lloti <dimggyt@gmail.com> (https://dim.codes)",
 	"name": "token-fucker",
 	"main": "index.js",
-	"start": "node index.js",
+	"scripts": {
+		"start": "node index.js"
+	},
 	"version": "1.0.0",
 	"description": "Reset, Scrape & Fuck Discord Tokens",
 	"private": true,
