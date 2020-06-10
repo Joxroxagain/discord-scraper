@@ -2,6 +2,7 @@
 	"author": "lloti <dimggyt@gmail.com> (https://dim.codes)",
 	"name": "token-fucker",
 	"main": "index.js",
+	"start": "node index.js",
 	"version": "1.0.0",
 	"description": "Reset, Scrape & Fuck Discord Tokens",
 	"private": true,
@@ -11,7 +12,6 @@
 	"dependencies": {
 		"express": "^4.16.2",
 		"moment": "^2.26.0",
-		"snekfetch": "^3.6.2",
 		"ws": "^4.0.0"
 	}
 }
