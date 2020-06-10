@@ -1,0 +1,5 @@
+node_modules
+.vscode/launch.json
+dev.config.json
+discordOld.js
+regex.js
