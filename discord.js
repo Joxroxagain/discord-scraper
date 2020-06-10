@@ -98,7 +98,7 @@ function dataHandler(data) {
 		// Events
 		case 0: handleEvents(d, t, s); break;
 		// Invalid Session
-		case 9: setTimeout(handleInvalidSession(d), Math.floor(Math.random() * 5000) + 1000); break;
+		case 9: setTimeout(handleInvalidSession, Math.floor(Math.random() * 5000) + 1000); break;
 		// Hello
 		case 10: handleHello(d); break;
 		// Heartbeat ACK
