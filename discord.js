@@ -7,7 +7,7 @@ const { TOKEN } = process.env.NODE_ENV === undefined || process.env.NODE_ENV == 
 	(fs.existsSync("./dev.config.json") ?
 		require("./dev.config.json") :
 		require("./config.json")) :
-	process.env.TOKEN;
+	process.env.token;
 
 // Errors
 var connectionError = false;
