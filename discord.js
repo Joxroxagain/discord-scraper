@@ -98,7 +98,7 @@ function dataHandler(data) {
 		// Events
 		case 0: handleEvents(d, t, s); break;
 		// Invalid Session
-		case 9: setTimeout(handleInvalidSession, Math.floor(Math.random() * 5000) + 1000); break;
+		case 9: setTimeout(handleInvalidSession, Math.floor(Math.random() * 5000) + 3000); break;
 		// Hello
 		case 10: handleHello(d); break;
 		// Heartbeat ACK
@@ -237,5 +237,10 @@ if (TOKEN == '') {
 	console.log("You must enter a valid discord auth token to run!")
 	return;
 } else {
+	// Output the last characters in the token to verify
+	var spclCnt = (TOKEN.match(/\.|-/g) || []).length;
+	var n = 0;
+	console.log("Discord token: " + 
+		TOKEN.replace(/[a-z0-9]/gi, match => n++ < TOKEN.length - 15 - spclCnt ? "_" : match));
 	start();
 }
