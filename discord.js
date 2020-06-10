@@ -1,5 +1,4 @@
 const WebSocket = require('ws');
-const { loose } = require('./regex');
 const moment = require('moment');
 const fs = require("fs");
 
