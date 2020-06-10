@@ -3,11 +3,11 @@ const moment = require('moment');
 const fs = require("fs");
 
 // Token for logging into discord, must be set in "config.json"
-const { TOKEN } = process.env.NODE_ENV === undefined || process.env.NODE_ENV == null || process.env.NODE_ENV == 'development' ?
+const TOKEN = process.env.NODE_ENV === undefined || process.env.NODE_ENV === null ?
 	(fs.existsSync("./dev.config.json") ?
-		require("./dev.config.json") :
-		require("./config.json")) :
-	process.env.token;
+		require("./dev.config.json").TOKEN :
+		require("./config.json").TOKEN) :
+	process.env.TOKEN;
 
 // Errors
 var connectionError = false;
