@@ -233,7 +233,7 @@ function getTime() {
 
 
 // Program logic
-if (TOKEN == '') {
+if (typeof TOKEN == 'undefined') {
 	console.log("You must enter a valid discord auth token to run!")
 	return;
 } else {
