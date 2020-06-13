@@ -1,246 +1,204 @@
 const WebSocket = require('ws');
-const moment = require('moment');
-const fs = require("fs");
+const EventEmitter = require('events');
 
-// Token for logging into discord, must be set in "config.json"
-const TOKEN = process.env.NODE_ENV === undefined || process.env.NODE_ENV === null ?
-	(fs.existsSync("./dev.config.json") ?
-		require("./dev.config.json").TOKEN :
-		require("./config.json").TOKEN) :
-	process.env.TOKEN;
-
-// Errors
-var connectionError = false;
-// Websocket
-var ws;
-const SOCKET_URL = 'wss://gateway.discord.gg/?v=7&encoding=json';
-// Heartbeat
-var hbRate;
-var hbInterval;
-var firstHB;
-var lastSequence;
-var sessionID;
-var heartbeat_ack_received;
-var sessionResumeable;
-
-// Error codes
-let errCodes = {
-	1000: "Normal closure",
-	1001: "Going away",
-	1002: "Protocol error",
-	1003: "Unsupported data",
-	1004: "Unknown (reserved)",
-	1005: "No status received",
-	1006: "Abnormal closure",
-	1007: "Invalid frame payload data",
-	1008: "Policy violation",
-	1009: "Message too big",
-	1010: "Missing extension",
-	1012: "Service restart",
-	1013: "Try again later",
-	1014: "Bad gateway",
-	1015: "TLS handshake failed",
-	4000: "Unknown error",
-	4001: "Unknown opcode",
-	4002: "Decode error",
-	4003: "Not authenticated",
-	4004: "Authentication failed",
-	4005: "Already authenticated",
-	4007: "Invalid sequence",
-	4008: "Rate limited",
-	4009: "Session timed out",
-	4010: "Invalid shard",
-	4011: "Sharding required",
-	4012: "Invalid API version",
-	4013: "Invalid intent(s)",
-	4014: "Disallowed intent(s)",
-}
-
-
-const start = () => {
-
-	ws = new WebSocket(SOCKET_URL);
-
-	ws.once('error', (err) => {
-		connectionError = true;
-		console.error(`${getTime()} Gateway close event error code: ${err}`);
-		shutdown();
-		setTimeout(() => {
-			console.info(`${getTime()} Restarting...`);
-			start();
-		}, 6000);
-	});
-
-	ws.once('open', () => {
-		connectionError = false;
-		console.log(`Monitor started @ ${moment().format('MMMM Do, h:mm:ss a')}`)
-
-		ws.once('close', (err) => {
-			shutdown();
-			console.error(`${getTime()} Gateway closed: ${err} - ${errCodes[err]}`);
-			if (!connectionError)
-				setTimeout(() => {
-					console.info(`${getTime()} Restarting...`);
-					start();
-				}, 6000);
-		});
-		ws.on('message', async data => {
-			dataHandler(data);
-		});
-	});
-
-};
-
-function dataHandler(data) {
-	const { op, d, t, s } = JSON.parse(data);
-
-	switch (op) {
-		// Events
-		case 0: handleEvents(d, t, s); break;
-		// Invalid Session
-		case 9: setTimeout(handleInvalidSession, Math.floor(Math.random() * 5000) + 3000); break;
-		// Hello
-		case 10: handleHello(d); break;
-		// Heartbeat ACK
-		case 11: handleHeartbeatResponse(); break;
-
-		// Catch all errors
-		default:
-			if (4000 <= op && op <= 4014) {
-				console.error(`${getTime()} Unplanned error: ${op} - ${errCodes[op]}`)
-			}
-			break;
-	}
-
-}
-
-function handleEvents(d, t, s) {
-	lastSequence = s;
-	if (t == 'READY') sessionID = d.session_id;
-	if (['MESSAGE_CREATE', 'MESSAGE_UPDATE'].includes(t) && d.content) {
-		console.log(
-			`${getTime()} New message:` +
-			`\n\tType: ${d.guild_id ? `Server - ID: ${d.guild_id}` : "DM"}` +
-			`\n\tFrom: ${d.author.username}` +
-			`\n\tContent: ${d.content}`
-		)
+let p = (func) => {
+	return (data) => {
+		func(JSON.parse(data));
 	}
 }
+let e = JSON.stringify;
+let encoding = 'json';
+try {
+	const erlpack = require('erlpack');
+	p = (func) => {
+		return (data) => {
+			func(erlpack.unpack(data));
+		}
+	}
+	e = erlpack.pack;
+	encoding = 'etf';
+} catch (e) {
+}
 
-function handleHello(d) {
-	hbRate = d.heartbeat_interval;
-	console.log(`${getTime()} Heart beat interval set to ${hbRate}`)
+class Connection {
+	constructor(main) {
+		this.socket = null;
+		this.hbinterval = null;
+		this.hbfunc = null;
+		this.hbtimer = null;
+		this.s = -1;
+		this.session = -1;
+		this.main = main;
+	}
 
-	// Send first heartbeat
-	firstHB = setTimeout(() => {
-		ws.send(JSON.stringify({
+	acknowledge() {
+		// this.main.emit('DEBUG', 'hb acknowledged');
+		this.hbfunc = this.beat;
+	}
+
+	beat() {
+		// this.main.emit('DEBUG', 'sending hb');
+		this.socket.send(e({
 			op: 1,
-			d: lastSequence
+			d: this.s
 		}));
-		// console.log(`${getTime()} Sent first heartbeat`)
-		heartbeat_ack_received = false;
-	}, hbRate);
-
-	// Start heartbeat interval
-	hbInterval = setTimeout(() => setInterval(heartbeat, hbRate), hbRate);
-
-	if (typeof sessionID == 'undefined') {
-		// Send Opcode 2 Identify to the Gateway
-		ws.send(JSON.stringify({
-			op: 2,
-			d: {
-				token: TOKEN,
-				properties: {
-					$os: process.platform,
-					$browser: 'NodeJS',
-					$device: 'NodeJS',
-				},
-			}
-		}));
-		console.log(`${getTime()} Sent identify handshake`);
-	} else {
-		//Send Opcode 6 Resume to the Gateway
-		ws.send(JSON.stringify({
-			op: 6,
-			d: {
-				token: TOKEN,
-				session_id: sessionID,
-				seq: lastSequence
-			}
-		}));
-		console.log(`${getTime()} Sent resume handshake`);
+		this.hbfunc = this.resume;
 	}
 
-}
+	resume() {
+		this.main.emit('DEBUG', 'attempting resume');
+		this.close().then(() =>
+			this.connect()
+		).then(() => {
+			this.main.emit('DEBUG', 'sent resume packet');
+			this.socket.send(e({
+				op: 6,
+				d: {
+					token: this.main.token,
+					session_id: this.session,
+					seq: this.s
+				}
+			}));
+		});
+	}
 
-function heartbeat() {
-	// no Heartbeat ACK recived, disconnect
-	if (!heartbeat_ack_received) {
-		ws.close(1002);
-		console.log(`${getTime()} Closed socket because there was no ACK response from server`);
-	} else {
-		ws.send(JSON.stringify({
-			op: 1,
-			d: lastSequence
-		}));
-		heartbeat_ack_received = false;
-		// console.log(`${getTime()} Sent heartbeat from interval`)
+	close() {
+		this.main.emit('DEBUG', 'client attempting to close connection');
+		if (this.hbtimer) {
+			clearInterval(this.hbtimer);
+		}
+		return new Promise((resolve, reject) => {
+			if (this.socket.readyState !== 3) {
+				this.socket.close(1001, 'cya later alligator');
+				this.socket.removeAllListeners('close');
+				this.socket.once('close', () => {
+					this.main.emit('DEBUG', 'client closed connection');
+					resolve();
+				});
+			} else {
+				resolve();
+			}
+		});
+	}
+
+	connect(cb) {
+		this.main.emit('DEBUG', 'starting connection packet');
+		return new Promise((resolve, reject) => {
+			this.socket = new WebSocket(this.main.url + '?encoding=' + encoding);
+			this.socket.once('open', () => {
+				this.main.emit('DEBUG', 'opened connection');
+				this.socket.once('message', p((payload) => {
+					this.main.emit('DEBUG', 'recieved heartbeat info ' + JSON.stringify(payload.d));
+					this.hbinterval = payload.d.heartbeat_interval;
+					this.hbfunc = this.beat;
+					if (this.hbtimer) {
+						clearInterval(this.hbtimer);
+					}
+					this.hbtimer = setInterval(() => this.hbfunc(), this.hbinterval);
+					if (!cb) {
+						setTimeout(() => resolve(this.identify()), 5000 - Date.now() + this.main.lastReady);
+					} else {
+						resolve(cb());
+					}
+				}));
+			});
+			this.socket.once('close', (code, reason) => {
+				this.main.emit('DEBUG', 'server closed connection. code: ' + code + ', reason: ' + reason + ' reconnecting in 10');
+				setTimeout(() => this.close().then(() => this.connect()), 10000);
+			});
+			this.socket.once('error', () => {
+				this.main.emit('DEBUG', 'recieved error ' + e.message + ', reconnecting in 5');
+				setTimeout(() => this.close().then(() => this.connect()), 5000);
+			});
+		});
+	}
+
+	send(data) {
+		this.socket.send(e(data));
+	}
+
+	identify() {
+		return new Promise((resolve, reject) => {
+			this.main.emit('DEBUG', 'sent identify packet');
+			this.socket.send(e({
+				op: 2,
+				d: {
+					token: this.main.token,
+					properties: {
+						$os: process.platform,
+						$browser: 'NodeJS',
+						$device: 'NodeJS',
+					}
+				}
+			}));
+			this.socket.on('message', p((payload) => {
+				this.s = payload.s;
+				this.main.emit('PAYLOAD', payload);
+				if (payload.op === 11) {
+					this.acknowledge();
+				} else if (payload.t === 'RESUMED') {
+					this.main.emit('DEBUG', 'successfully resumed');
+				} else if (payload.op === 0) {
+					this.main.emit(payload.t, payload.d);
+				}
+			}));
+			this.socket.once('message', p((payload) => {
+				if (payload.t === 'READY') {
+					this.session = payload.d.session_id;
+					this.main.emit('DEBUG', 'is ready');
+					resolve({ timeReady: Date.now(), socket: this });
+				} else if (payload.op === 9) {
+					this.main.emit('DEBUG', 'invalid session, reconnecting in 5');
+					setTimeout(() => this.close().then(() => this.connect()), 5000);
+				}
+			}));
+		});
 	}
 }
 
-function handleHeartbeatResponse() {
-	heartbeat_ack_received = true;
-	// console.log(`${getTime()} Got heartbeat acknowledgement from server`)
-}
-
-function handleInvalidSession() {
-
-	if (sessionResumeable && typeof sessionID != 'undefined') {
-		ws.send(JSON.stringify({
-			op: 6,
-			d: {
-				token: TOKEN,
-				session_id: sessionID,
-				seq: lastSequence
-			}
-		}));
-		console.log(`${getTime()} Sent resume handshake`);
-	} else {
-		ws.send(JSON.stringify({
-			op: 2,
-			d: {
-				token: TOKEN,
-				properties: {
-					$os: process.platform,
-					$browser: 'NodeJS',
-					$device: 'NodeJS',
-				},
-			}
-		}));
-		console.log(`${getTime()} Sent identify handshake`);
+class GatewaySocket extends EventEmitter {
+	constructor(token) {
+		super();
+		this.token = token;
+		this.socket;
 	}
 
+	getGatewayInfo() {
+		return new Promise((resolve, reject) => {
+			require('https').get({
+				hostname: 'discordapp.com',
+				path: '/api/gateway',
+				// headers: {
+				// 	Authorization: "Bot " + this.token
+				// }
+			}, (res) => {
+				let data = '';
+				res.on('data', (d) => {
+					data += d;
+				});
+				res.on('end', () => {
+					resolve(JSON.parse(data));
+				});
+			}).on('error', reject);
+		});
+	}
+
+	async connect() {
+		const { url } = await this.getGatewayInfo();
+		this.url = url;
+
+		if (this.socket) await this.socket.close();
+		this.socket = new Connection(this);
+		this.socket.connect()
+	}
+
+	send(data) {
+		this.socket.send(data);
+	}
 }
 
-function shutdown() {
-	clearInterval(hbInterval);
-	clearTimeout(firstHB);
+function connectToGateway(token) {
+	return new GatewaySocket(token);
 }
 
-function getTime() {
-	return `[ ${moment().format('MMMM Do, h:mm:ss a')} ]`;
-}
-
-
-// Program logic
-if (typeof TOKEN == 'undefined') {
-	console.log("You must enter a valid discord auth token to run!")
-	return;
-} else {
-	// Output the last characters in the token to verify
-	var spclCnt = (TOKEN.match(/\.|-/g) || []).length;
-	var n = 0;
-	console.log("Discord token: " + 
-		TOKEN.replace(/[a-z0-9]/gi, match => n++ < TOKEN.length - 15 - spclCnt ? "_" : match));
-	start();
-}
+module.exports = connectToGateway;
