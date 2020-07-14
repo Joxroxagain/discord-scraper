@@ -1,8 +1,13 @@
-const WebSocket = require('ws');
+const { Server } = require('ws');
+const express = require('express');
 
 class SocketServer {
     constructor() {
-        this.wss = new WebSocket.Server({ port: 8080 })
+        this.port = 8080;
+        this.server = express()
+            .use((req, res) => res.send(`<p>WebSocket port ${this.port}</p>`))
+            .listen(this.port, () => console.log(`wss listening on ${this.port}`));
+        this.wss = new Server({ server: this.server })
             .on('connection', function connection(w) {
                 console.log(`New connection`);
                 w.on('message', function (msg) {

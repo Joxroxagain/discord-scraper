@@ -11,6 +11,7 @@
 		"eslint-config-dim": "git+https://gist.github.com/3c110280de2a056495623585b6d5d87e.git"
 	},
 	"dependencies": {
+		"express": "^4.17.1",
 		"moment": "^2.26.0",
 		"ws": "^4.0.0"
 	}
