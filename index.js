@@ -39,7 +39,7 @@ socket.on("MESSAGE_CREATE", (data) => {
       }
     } else {
       console.log(
-        `${getTimeStamp()} New embed: ${JSON.stringify(data.content)}`
+        `${getTimeStamp()} New embed: ${JSON.stringify(data)}`
       );
     }
   }
