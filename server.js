@@ -13,7 +13,6 @@ class SocketServer {
           if (msg === "PING") {
             w.send("PONG");
           }
-          console.log("message from client: " + msg);
         });
         w.on("close", function () {
           console.log("closing connection");

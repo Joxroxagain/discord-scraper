@@ -28,6 +28,9 @@ socket.connect();
 socket.on("MESSAGE_CREATE", (data) => {
   if (channels.includes(data.channel_id)) {
     if (data.embeds.length) {
+      console.log(
+        `${getTimeStamp()} New embed: ${JSON.stringify(data.embeds[0])}`
+      );
       const res = parseMessage(data);
 
       if (res) {
