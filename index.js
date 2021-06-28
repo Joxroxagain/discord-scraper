@@ -32,7 +32,7 @@ socket.on("MESSAGE_CREATE", (data) => {
 
       if (res) {
         console.log(`${getTimeStamp()} New embed: ${JSON.stringify(res)}`);
-        server.send(res);
+        server.send(JSON.stringify(res));
       }
     }
   }
