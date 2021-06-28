@@ -11,7 +11,7 @@ class SocketServer {
         w.on("message", function (msg) {
           msg = msg.toString("utf8");
           if (msg === "PING") {
-            ws.send("PONG");
+            w.send("PONG");
           }
           console.log("message from client: " + msg);
         });
