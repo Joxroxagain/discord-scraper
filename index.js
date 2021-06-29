@@ -27,20 +27,22 @@ socket.connect();
 
 socket.on("MESSAGE_CREATE", (data) => {
   if (channels.includes(data.channel_id)) {
-    if (data.embeds.length) {
-      console.log(
-        `${getTimeStamp()} New embed: ${JSON.stringify(data.embeds[0])}`
-      );
-      const res = parseMessage(data);
+    server.send(JSON.stringify(data));
 
-      if (res) {
-        console.log(`${getTimeStamp()} New embed: ${JSON.stringify(res)}`);
-        server.send(JSON.stringify(res));
-      }
-    } else {
-      console.log(`${getTimeStamp()} New embed: ${JSON.stringify(data)}`);
-      server.send(JSON.stringify(data));
-    }
+    // if (data.embeds.length) {
+    //   console.log(
+    //     `${getTimeStamp()} New embed: ${JSON.stringify(data.embeds[0])}`
+    //   );
+    //   const res = parseMessage(data);
+
+    //   if (res) {
+    //     console.log(`${getTimeStamp()} New embed: ${JSON.stringify(res)}`);
+    //     server.send(JSON.stringify(res));
+    //   }
+    // } else {
+    //   console.log(`${getTimeStamp()} New message: ${JSON.stringify(data)}`);
+    //   server.send(JSON.stringify(data));
+    // }
   }
 });
 socket.on("DEBUG", (message) => {
